@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leitor RFID</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { margin: 0; padding: 14px; background: #111827; color: #f9fafb; }
+    h1 { font-size: 1.2rem; margin: 0 0 10px; }
+    .box { display: flex; gap: 8px; margin-bottom: 10px; }
+    input {
+      flex: 1; padding: 12px; font-size: 1rem; border-radius: 8px;
+      border: 2px solid #374151; background: #1f2937; color: #fff; outline: none;
+    }
+    input:focus { border-color: #3b82f6; }
+    button {
+      padding: 10px 14px; border: none; border-radius: 8px;
+      font-weight: bold; cursor: pointer; background: #2563eb; color: #fff;
+    }
+    button.sec { background: #374151; }
+    button.danger { background: #dc2626; }
+    .bar {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 8px; margin-bottom: 10px; font-size: 0.9rem;
+    }
+    .lista {
+      background: #1f2937; border-radius: 8px; padding: 10px;
+      max-height: 65vh; overflow-y: auto;
+    }
+    .item {
+      display: flex; justify-content: space-between; padding: 8px 6px;
+      border-bottom: 1px solid #374151; font-family: monospace; font-size: 0.95rem;
+    }
+    .item:last-child { border-bottom: none; }
+    .hora { color: #9ca3af; font-size: 0.8rem; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Leitura RFID</h1>
+
+  <div class="box">
+    <input id="rfidInput" type="text" placeholder="Aguardando leitura RFID..." autocomplete="off" autofocus />
+    <button onclick="adicionarManual()">OK</button>
+  </div>
+
+  <div class="bar">
+    <span>Total lido: <strong id="total">0</strong></span>
+    <div>
+      <button class="sec" onclick="exportarCSV()">CSV</button>
+      <button class="danger" onclick="limpar()">Limpar</button>
+    </div>
+  </div>
+
+  <div class="lista" id="lista"></div>
+
+  <script>
+    const leituras = [];
+    const input = document.getElementById("rfidInput");
+    const listaEl = document.getElementById("lista");
+    const totalEl = document.getElementById("total");
+
+    function manterFoco() {
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function registrarCodigo(raw) {
+      const codigo = (raw || "").trim();
+      if (!codigo) return;
+
+      const agora = new Date().toLocaleTimeString("pt-BR");
+      leituras.unshift({ codigo, hora: agora });
+      renderizar();
+    }
+
+    // Função que o Android WebView pode chamar diretamente via evaluateJavascript
+    window.receberRFID = function (codigo) {
+      registrarCodigo(codigo);
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        registrarCodigo(input.value);
+        input.value = "";
+        manterFoco();
+      }
+    });
+
+    function adicionarManual() {
+      registrarCodigo(input.value);
+      input.value = "";
+      manterFoco();
+    }
+
+    function renderizar() {
+      totalEl.textContent = leituras.length;
+      listaEl.innerHTML = leituras
+        .map((item, idx) => `
+          <div class="item">
+            <span><strong>#${leituras.length - idx}</strong> ${item.codigo}</span>
+            <span class="hora">${item.hora}</span>
+          </div>
+        `)
+        .join("");
+    }
+
+    function limpar() {
+      leituras.length = 0;
+      renderizar();
+      manterFoco();
+    }
+
+    function exportarCSV() {
+      if (!leituras.length) return;
+      const linhas = ["sequencia,codigo_rfid,hora", ...leituras.slice().reverse().map((x, i) => `${i + 1},"${x.codigo}","${x.hora}"`)];
+      const blob = new Blob([linhas.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "leituras_rfid.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+      manterFoco();
+    }
+
+    window.addEventListener("load", manterFoco);
+  </script>
+</body>
+</html>
